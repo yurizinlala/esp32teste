@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Controle LED via MQTT</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        button { font-size: 20px; padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .on { background-color: #4CAF50; color: white; }
+        .off { background-color: #f44336; color: white; }
+        .color { background-color: #008CBA; color: white; }
+        #status { margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>Controle Remoto do LED</h1>
+    <div id="status">Conectando ao MQTT...</div>
+
+    <button class="on" onclick="sendMessage('ON')">Ligar (Branco)</button>
+    <button class="off" onclick="sendMessage('OFF')">Desligar</button>
+    <br>
+    <button class="color" onclick="sendMessage('RAINBOW')">Arco-íris</button>
+    <br>
+    <button class="color" style="background-color:red;" onclick="sendMessage('RED')">Vermelho</button>
+    <button class="color" style="background-color:green;" onclick="sendMessage('GREEN')">Verde</button>
+    <button class="color" style="background-color:blue;" onclick="sendMessage('BLUE')">Azul</button>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <script>
+        // Configuração do cliente MQTT
+        const client = new Paho.MQTT.Client("b8c5aac0bdd44ce19d170343734571f4.s1.eu.hivemq.cloud", Number(8884), "webclient_" + Math.random().toString(16).substr(2, 8));
+        
+        const statusDiv = document.getElementById("status");
+
+        client.onConnectionLost = function (responseObject) {
+            if (responseObject.errorCode !== 0) {
+                statusDiv.innerHTML = "Conexão perdida: " + responseObject.errorMessage;
+                console.log("Conexão perdida: " + responseObject.errorMessage);
+            }
+        };
+
+        client.onMessageArrived = function (message) {
+            console.log("Mensagem recebida: " + message.payloadString);
+        };
+
+        // --- CREDENCIAIS PREENCHIDAS ---
+        const mqtt_user = "esp32-teste";
+        const mqtt_password = "Esp32teste";
+
+        // Conecta ao broker
+        client.connect({
+            userName: mqtt_user,
+            password: mqtt_password,
+            onSuccess: function () {
+                statusDiv.innerHTML = "Conectado ao Broker MQTT! Pronto para controlar.";
+                console.log("Conectado!");
+            },
+            onFailure: function (message) {
+                statusDiv.innerHTML = "Falha na conexão: " + message.errorMessage;
+                console.log("Falha na conexão: " + message.errorMessage);
+            },
+            useSSL: true
+        });
+
+        function sendMessage(command) {
+            if (statusDiv.innerHTML.includes("Conectado")) {
+                const message = new Paho.MQTT.Message(command);
+                message.destinationName = "casa/sala/led/comando";
+                client.send(message);
+                console.log("Comando enviado: " + command);
+            } else {
+                alert("Ainda não conectado ao broker!");
+            }
+        }
+    </script>
+
+</body>
+</html>
