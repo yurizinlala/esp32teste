@@ -1,79 +1,280 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
-    <title>Controle LED via MQTT</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle LED ESP32</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-        button { font-size: 20px; padding: 10px 20px; margin: 5px; cursor: pointer; }
-        .on { background-color: #4CAF50; color: white; }
-        .off { background-color: #f44336; color: white; }
-        .color { background-color: #008CBA; color: white; }
-        #status { margin-top: 20px; font-weight: bold; }
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+            --light-color: #f8f9fa;
+            --dark-color: #343a40;
+            --card-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, var(--light-color), #e9ecef);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 500px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: var(--dark-color);
+            margin: 0;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--secondary-color);
+            margin-left: 10px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background-color: var(--success-color);
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(108, 117, 125, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(108, 117, 125, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(108, 117, 125, 0); }
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: var(--card-shadow);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            margin-top: 0;
+            color: var(--dark-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .button-group.single {
+            grid-template-columns: 1fr;
+        }
+
+        button {
+            padding: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            color: white;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-on { background-color: var(--success-color); }
+        .btn-off { background-color: var(--danger-color); }
+        .btn-rainbow { background-color: var(--warning-color); color: var(--dark-color); }
+        .btn-red { background-color: #e74c3c; }
+        .btn-green { background-color: #2ecc71; }
+        .btn-blue { background-color: #3498db; }
+
+        .slider-container {
+            margin-top: 15px;
+        }
+
+        .slider {
+            width: 100%;
+            -webkit-appearance: none;
+            height: 10px;
+            border-radius: 5px;
+            background: #d3d3d3;
+            outline: none;
+            opacity: 0.9;
+            transition: opacity 0.2s;
+        }
+
+        .slider:hover {
+            opacity: 1;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+        }
+        
+        #brilhoValor {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 20px;
+            color: var(--secondary-color);
+            font-size: 14px;
+        }
+
     </style>
 </head>
 <body>
 
-    <h1>Controle Remoto do LED</h1>
-    <div id="status">Conectando ao MQTT...</div>
+    <div class="container">
+        <header>
+            <h1>Painel de Controle LED</h1>
+            <span id="status">Conectando...</span>
+            <span id="statusIndicator" class="status-indicator"></span>
+        </header>
 
-    <button class="on" onclick="sendMessage('ON')">Ligar (Branco)</button>
-    <button class="off" onclick="sendMessage('OFF')">Desligar</button>
-    <br>
-    <button class="color" onclick="sendMessage('RAINBOW')">Arco-íris</button>
-    <br>
-    <button class="color" style="background-color:red;" onclick="sendMessage('RED')">Vermelho</button>
-    <button class="color" style="background-color:green;" onclick="sendMessage('GREEN')">Verde</button>
-    <button class="color" style="background-color:blue;" onclick="sendMessage('BLUE')">Azul</button>
+        <main>
+            <section class="card">
+                <h2>Comandos Principais</h2>
+                <div class="button-group">
+                    <button class="btn-on" onclick="sendMessage('esp32/cmd', 'ON')">Ligar</button>
+                    <button class="btn-off" onclick="sendMessage('esp32/cmd', 'OFF')">Desligar</button>
+                </div>
+                <div class="button-group single">
+                    <button class="btn-rainbow" onclick="sendMessage('esp32/cmd', 'RAINBOW')">🌈 Modo Arco-íris</button>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>Cores</h2>
+                <div class="button-group">
+                    <button class="btn-red" onclick="sendMessage('esp32/cmd', 'RED')">Vermelho</button>
+                    <button class="btn-green" onclick="sendMessage('esp32/cmd', 'GREEN')">Verde</button>
+                    <button class="btn-blue" onclick="sendMessage('esp32/cmd', 'BLUE')">Azul</button>
+                    <button class="btn-on" onclick="sendMessage('esp32/cmd', 'ON')">Branco</button>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>Controle de Brilho</h2>
+                <div class="slider-container">
+                    <input type="range" min="0" max="255" value="100" class="slider" id="brilhoSlider">
+                    <p>Brilho: <span id="brilhoValor">100</span></p>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Controlado via MQTT</p>
+        </footer>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <script>
-        // Configuração do cliente MQTT
         const client = new Paho.MQTT.Client("b8c5aac0bdd44ce19d170343734571f4.s1.eu.hivemq.cloud", Number(8884), "webclient_" + Math.random().toString(16).substr(2, 8));
         
         const statusDiv = document.getElementById("status");
+        const statusIndicator = document.getElementById("statusIndicator");
+        const slider = document.getElementById("brilhoSlider");
+        const valorSpan = document.getElementById("brilhoValor");
+
+        function updateStatus(text, isConnected) {
+            statusDiv.innerHTML = text;
+            if (isConnected) {
+                statusIndicator.classList.add("connected");
+            } else {
+                statusIndicator.classList.remove("connected");
+            }
+        }
 
         client.onConnectionLost = function (responseObject) {
-            if (responseObject.errorCode !== 0) {
-                statusDiv.innerHTML = "Conexão perdida: " + responseObject.errorMessage;
-                console.log("Conexão perdida: " + responseObject.errorMessage);
-            }
+            updateStatus("Conexão perdida.", false);
+            console.error("Conexão perdida: " + responseObject.errorMessage);
         };
 
         client.onMessageArrived = function (message) {
             console.log("Mensagem recebida: " + message.payloadString);
         };
 
-        // --- CREDENCIAIS PREENCHIDAS ---
         const mqtt_user = "esp32-teste";
         const mqtt_password = "Esp32teste";
 
-        // Conecta ao broker
         client.connect({
             userName: mqtt_user,
             password: mqtt_password,
             onSuccess: function () {
-                statusDiv.innerHTML = "Conectado ao Broker MQTT! Pronto para controlar.";
-                console.log("Conectado!");
+                updateStatus("Conectado!", true);
+                console.log("Conectado ao Broker MQTT!");
             },
             onFailure: function (message) {
-                statusDiv.innerHTML = "Falha na conexão: " + message.errorMessage;
-                console.log("Falha na conexão: " + message.errorMessage);
+                updateStatus("Falha na conexão.", false);
+                console.error("Falha na conexão: " + message.errorMessage);
             },
             useSSL: true
         });
 
-        function sendMessage(command) {
+        function sendMessage(topic, payload) {
             if (statusDiv.innerHTML.includes("Conectado")) {
-                const message = new Paho.MQTT.Message(command);
-                message.destinationName = "casa/sala/led/comando";
+                const message = new Paho.MQTT.Message(payload);
+                message.destinationName = topic;
                 client.send(message);
-                console.log("Comando enviado: " + command);
+                console.log("Comando enviado: " + payload + " para o tópico: " + topic);
             } else {
-                alert("Ainda não conectado ao broker!");
+                alert("Ainda não conectado ao broker! Aguarde um momento.");
             }
         }
-    </script>
 
+        slider.oninput = function() {
+            valorSpan.innerHTML = this.value;
+            sendMessage("esp32/brilho", this.value);
+        };
+    </script>
 </body>
 </html>
